@@ -1,0 +1,93 @@
+USE [Reporting]
+GO
+/****** Object:  StoredProcedure [dbo].[UnitTest_PeopleFitnessETL_Send]    Script Date: 3/16/2020 11:39:25 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		Gita Paudyal
+-- Create date: 06/18/2019
+-- Description:	Purpose of this Procedure is to send out an email for 
+--				PeopleFitnessETL
+-- =============================================
+ALTER PROCEDURE [dbo].[UnitTest_PeopleFitnessETL_Send]
+AS
+BEGIN
+	
+	DECLARE @unitTest TABLE(
+		ID INT IDENTITY(1,1)
+		,TblNm VARCHAR(50) NULL	
+		,CountsOf_104 INT
+		,CountsOf_108 INT
+		,Compare VARCHAR(50) NULL	
+	)
+
+	DECLARE @count INT = 1
+	,@max INT = 0
+	,@emailBody VARCHAR(MAX) = ''
+	,@evenColor VARCHAR(10) = '#FFFFFF'--'#45aaf2'
+	,@oddColor varchar(10) = '#F6F6F7'--'#2d98da'
+	,@cellColor varchar(10) = ''
+	,@CustIdCount [varchar](75) =''
+	,@Column varchar(75) =''	
+	,@SQLValue varchar(75) =''
+	,@LyticsValue varchar(75) =''
+
+
+
+
+	INSERT INTO @unitTest
+	select [TblNm_108] TblNm,
+                  [CountOf_104],
+                  [CountOf_108],
+                  [Compare]		
+	 from [Reporting].[dbo].[UnitTest_PeopleFitnessETL]
+	 Order by Compare desc
+	 
+	 select * from @unitTest
+
+	SELECT @max = COUNT(*) FROM @unitTest
+
+
+	SELECT @emailBody = @emailBody + '<html><head></head><body><h2><b><u>People Fitness ETL Unit Test</b></u> <h2></br> </br> '
+						+ '<table border="1" cellpadding="3" cellspacing="0" style="color:#3C5161;font-family:Arial;"><tr bgcolor = "#027ddb" style="color:#FFF;"> '
+						+ '<th>Table Name</th>'
+						+ '<th>CountsOf_104</th>'	
+						+ '<th>CountsOf_108</th>'	
+						+ '<th>Compare</th>'						
+											
+											
+						+ '</tr>'
+
+	WHILE @count <= @max
+	BEGIN
+	
+		SELECT  @cellColor = CASE WHEN @count % 2 = 0 THEN @evenColor else @oddColor end		
+
+		SELECT @emailBody = @emailBody + '<tr bgcolor = '+@cellColor+' > '
+						  + '<td>' + TblNm  + '</td>'
+						  + '<td>' + cast(CountsOf_104 as varchar(10))  + '</td>'
+						  + '<td>' + cast(CountsOf_108 as varchar(10))  + '</td>'
+						  + '<td>' + Compare  + '</td>'						
+						  + '</tr>'
+
+		FROM @unitTest
+		WHERE id = @count
+
+		SET @count = @count + 1
+
+	END
+
+	SELECT @emailBody = @emailBody + '</table></body></html>'
+
+
+
+	EXEC msdb.dbo.sp_send_dbmail		
+		@recipients=N'Data_Integration@1800contacts.com;MNOBLE@1800contacts.com',
+		--@recipients=N'gpaudyal@1800contacts.com',
+		@body= @emailBody,
+		@subject = 'People Fitness ETL Daily Load Unit Test',
+		@profile_name = 'DI Alerts',
+		@body_format = 'HTML';
+END
